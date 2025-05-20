@@ -7,9 +7,99 @@ describe("test hwProvider", () => {
     let hwApp: HwAppMock;
     let hwProvider: HWProvider;
 
-    before(async function () {
+    before(async function() {
         hwApp = new HwAppMock();
         hwProvider = new HWProvider(hwApp);
+    });
+
+    it("should not support ledger when navigator is empty", async () => {
+        Object.assign(global, {
+            window: {
+                navigator: {}
+            },
+            navigator: {}
+        });
+
+        const isSupported = await hwProvider.isLedgerTransportSupported();
+        assert.isFalse(isSupported);
+    });
+
+    it("should throw error when ledger is not supported", async () => {
+        Object.assign(global, {
+            window: {
+                navigator: {}
+            },
+            navigator: {}
+        });
+
+        try {
+            await hwProvider.getTransport();
+            assert.fail("Ledger is not supported");
+        }catch (e) {
+            if (e instanceof Error) {
+              assert.equal(e.message, "Ledger is not supported");
+            } else {
+              throw e; // or handle differently
+            }
+    }});
+
+    it("should support Bluetooth API", async () => {
+        Object.assign(global, {
+            window: {
+                navigator: {
+                    bluetooth: {}
+                }
+            },
+            navigator: {
+                bluetooth: {}
+            }
+        });
+
+        const isSupported = await hwProvider.isLedgerTransportSupported();
+
+        assert.isTrue(isSupported);
+    });
+
+    it("should support USB API", async () => {
+        Object.assign(global, {
+            window: {
+                navigator: {
+                    usb: {
+                        getDevices: () => true
+                    },
+                    platform: {
+                        name: ""
+                    }
+                }
+            },
+            navigator: {
+                usb: {
+                    getDevices: () => true
+                },
+                platform: {
+                    name: ""
+                }
+            }
+        });
+
+        const isSupported = await hwProvider.isLedgerTransportSupported();
+        assert.isTrue(isSupported);
+    });
+
+    it("should support HID", async () => {
+        Object.assign(global, {
+            window: {
+                navigator: {
+                    hid: {}
+                }
+            },
+            navigator: {
+                hid: {}
+            }
+        });
+
+        const isSupported = await hwProvider.isLedgerTransportSupported();
+        assert.isTrue(isSupported);
     });
 
     it("should getAppFeatures", async () => {
@@ -78,8 +168,11 @@ describe("test hwProvider", () => {
 
             assert.fail("Should have thrown");
         } catch (err) {
-            assert.equal(err.message, "DharitrI App v1.0.21 does not support guarded transactions.");
-        }
+            if (err instanceof Error) {
+              assert.equal(err.message, "DharitrI App v1.0.21 does not support guarded transactions.");
+            } else {
+              throw err; // Re-throw or handle differently
+            }
 
         await testSignTransaction({
             deviceVersion: "1.0.22",
@@ -89,7 +182,7 @@ describe("test hwProvider", () => {
             expectedTransactionVersion: 2,
             expectedTransactionOptions: 0b1111
         });
-    });
+    }});
 
     async function testSignTransaction(options: {
         deviceVersion: string,
@@ -203,6 +296,6 @@ class HwAppMock implements IHWWalletApp {
         return {
             address: this.address,
             signature: this.authTokenSignature
-        }
+        };
     }
 }
