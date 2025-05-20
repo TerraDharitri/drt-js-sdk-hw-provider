@@ -1,4 +1,4 @@
-import { Address, SignableMessage, Transaction } from "@terradharitri/sdk-core";
+import { Address, MessageComputer, Transaction, Message } from "@terradharitri/sdk-core";
 import { assert } from "chai";
 import { HWProvider } from "./hwProvider";
 import { IHWWalletApp } from "./interface";
@@ -35,13 +35,10 @@ describe("test hwProvider", () => {
         try {
             await hwProvider.getTransport();
             assert.fail("Ledger is not supported");
-        }catch (e) {
-            if (e instanceof Error) {
-              assert.equal(e.message, "Ledger is not supported");
-            } else {
-              throw e; // or handle differently
-            }
-    }});
+        } catch (e) {
+            assert.equal(e.message, "Ledger is not supported");
+        }
+    });
 
     it("should support Bluetooth API", async () => {
         Object.assign(global, {
@@ -168,11 +165,8 @@ describe("test hwProvider", () => {
 
             assert.fail("Should have thrown");
         } catch (err) {
-            if (err instanceof Error) {
-              assert.equal(err.message, "DharitrI App v1.0.21 does not support guarded transactions.");
-            } else {
-              throw err; // Re-throw or handle differently
-            }
+            assert.equal(err.message, "DharitrI App v1.0.21 does not support guarded transactions.");
+        }
 
         await testSignTransaction({
             deviceVersion: "1.0.22",
@@ -182,7 +176,7 @@ describe("test hwProvider", () => {
             expectedTransactionVersion: 2,
             expectedTransactionOptions: 0b1111
         });
-    }});
+    });
 
     async function testSignTransaction(options: {
         deviceVersion: string,
@@ -239,21 +233,23 @@ describe("test hwProvider", () => {
     });
 
     it("should signMessage", async () => {
-        const message = new SignableMessage({
-            message: Buffer.from("Hello World"),
+        const messageToSign = new Message({
+            data: Buffer.from("Hello World"),
             address: Address.fromBech32("drt1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssey5egf"),
             version: 42
-        });
+        }); 
+
 
         hwApp.messageSignature = "abba";
 
-        const signedMessage = await hwProvider.signMessage(message);
+        const messageComputer = new MessageComputer();
 
-        assert.equal(signedMessage.message.toString(), "Hello World");
-        assert.equal(signedMessage.address.toString(), "drt1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssey5egf");
+        const signedMessage = await hwProvider.signMessage(messageToSign);
+
+        assert.equal(signedMessage.address?.toString(), "drt1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssey5egf");
         assert.equal(signedMessage.version, 42);
-        assert.equal(signedMessage.getSignature().toString("hex"), "abba");
-        assert.deepEqual(message.serializeForSigning(), signedMessage.serializeForSigning());
+        assert.equal(Buffer.from(signedMessage.signature!).toString("hex"), "abba");
+        assert.deepEqual(messageComputer.computeBytesForSigning(messageToSign), messageComputer.computeBytesForSigning(signedMessage));
     });
 });
 
